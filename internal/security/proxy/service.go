@@ -129,9 +129,12 @@ func (s *Service) ResetProxy() error {
 	return nil
 }
 
+// Init initializes all of the services, routes, and plugins for the Kong
+// gateway. Service, route, and plugin definitions are pulled from the
+// associated configuration.toml file
 func (s *Service) Init() error {
-	// no cert pair to post internally any more
-
+	
+	// Parse any services/routes defined in ADD_PROXY_ROUTE env var
 	addRoutesFromEnv, parseErr := s.parseAdditionalProxyRoutes()
 
 	if parseErr != nil {
@@ -401,17 +404,20 @@ func (s *Service) initKongRoutes(r *KongRoute, name string) error {
 	return nil
 }
 
-func (s *Service) initACL(name string, whitelist string) error {
-	aclParams := &KongACLPlugin{
-		Name:      name,
-		WhiteList: whitelist,
-	}
+func (s *Service) initACL(name string, allow string) error {
+	// aclParams := &KongACLPlugin{
+	// 	Name:  name,
+	// 	Allow: allow,
+	// }
 	// The type above is largely useless but I'm leaving it for now as otherwise there'd be no way to know
 	// where or why the second field below is "config.whitelist"
+
+	// Set basic parameters for Kong:Plugin:ACL - name: "acl", allow: "<group>"
 	formVals := url.Values{
-		"name":             {aclParams.Name},
-		"config.whitelist": {aclParams.WhiteList},
+		"name":         name,
+		"config.allow": allow,
 	}
+
 	tokens := []string{s.configuration.KongURL.GetProxyBaseURL(), PluginsPath}
 	req, err := http.NewRequest(http.MethodPost, strings.Join(tokens, "/"), strings.NewReader(formVals.Encode()))
 	if err != nil {
@@ -483,6 +489,11 @@ func (s *Service) initJWTAuth() error {
 		s.loggingClient.Error(e)
 		return errors.New(e)
 	}
+	return nil
+}
+
+// initAdmin will initialize the admin route
+func (s *Service) initAdmin() error {
 	return nil
 }
 

@@ -35,6 +35,7 @@ import (
 	"github.com/edgexfoundry/edgex-go/internal/security/bootstrapper/kong/config"
 	"github.com/edgexfoundry/edgex-go/internal/security/bootstrapper/kong/container"
 	bootstrapContainer "github.com/edgexfoundry/go-mod-bootstrap/v2/bootstrap/container"
+	"github.com/edgexfoundry/go-mod-bootstrap/v2/bootstrap/interfaces"
 	"github.com/edgexfoundry/go-mod-bootstrap/v2/bootstrap/startup"
 	"github.com/edgexfoundry/go-mod-bootstrap/v2/di"
 	"github.com/edgexfoundry/go-mod-core-contracts/v2/clients/logger"
@@ -50,10 +51,11 @@ const (
 
 // Handler is the main struct for the Kong Admin API Loopback setup
 type Handler struct {
-	logger logger.LoggingClient
-	config *config.ConfigurationStruct
-	keys   KeyInfo
-	jwt    JWTInfo
+	logger         logger.LoggingClient
+	secretProvider interfaces.SecretProvider
+	config         *config.ConfigurationStruct
+	keys           KeyInfo
+	jwt            JWTInfo
 }
 
 // KeyInfo stores EC public/private key information
@@ -82,10 +84,11 @@ func NewHandler(dic *di.Container) *Handler {
 
 	// Return struct
 	return &Handler{
-		logger: bootstrapContainer.LoggingClientFrom(dic.Get),
-		config: container.ConfigurationFrom(dic.Get),
-		keys:   KeyInfo{},
-		jwt:    JWTInfo{},
+		logger:         bootstrapContainer.LoggingClientFrom(dic.Get),
+		secretProvider: bootstrapContainer.SecretProviderFrom(dic.Get),
+		config:         container.ConfigurationFrom(dic.Get),
+		keys:           KeyInfo{},
+		jwt:            JWTInfo{},
 	}
 }
 
@@ -102,10 +105,8 @@ func NewHandler(dic *di.Container) *Handler {
 func (h *Handler) SetupLoopbackAPI(ctx context.Context, _ *sync.WaitGroup, startupTimer startup.Timer,
 	dic *di.Container) bool {
 
-	// Setup vars
+	// Setup empty err var for flow purposes only
 	var err error
-	// logger := bootstrapContainer.LoggingClientFrom(dic.Get)
-	// secretProvider := bootstrapContainer.SecretProviderFrom(dic.Get)
 
 	h.logger.Infof("%s Loopback API setup is starting", cmdPrefix)
 
@@ -116,6 +117,7 @@ func (h *Handler) SetupLoopbackAPI(ctx context.Context, _ *sync.WaitGroup, start
 	// in the Handler{} struct (although now I'm thinking it might not be
 	// necessary). //TODO: Is it still necessary?
 	// ------------------------------------------------------------------------
+	h.logger.Infof("%s Creating public/private key pair combo", infoPrefix)
 	h.keys.privateKeyEC, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		h.logger.Errorf("%s Failed to generate private/public key pair: %w", errPrefix, err)
@@ -148,6 +150,7 @@ func (h *Handler) SetupLoopbackAPI(ctx context.Context, _ *sync.WaitGroup, start
 	// command line, or modifying <var>.paths.templatePath after instantiating
 	// a new Handler{}.
 	// ------------------------------------------------------------------------
+	h.logger.Infof("%s Reading in configuration template file from: ", infoPrefix, h.config.KongPaths.TemplatePath)
 	configTemplateBytes, err := ioutil.ReadFile(h.config.KongPaths.TemplatePath)
 	if err != nil {
 		h.logger.Errorf("%s Failed to read config template from file %s: %w", errPrefix, h.config.KongPaths.TemplatePath, err)
@@ -170,7 +173,10 @@ func (h *Handler) SetupLoopbackAPI(ctx context.Context, _ *sync.WaitGroup, start
 	// ------------------------------------------------------------------------
 
 	// Completely random value for token generation
+	h.logger.Infof("%s Generating random JWT issuer value", infoPrefix)
 	h.jwt.issuer = helper.GenerateRandomString(32)
+
+	h.logger.Infof("%s Modifying configuration template with public key and JWT issuer values", infoPrefix)
 
 	// Insert public key
 	configTemplateText := strings.Replace(string(configTemplateBytes),
@@ -189,6 +195,7 @@ func (h *Handler) SetupLoopbackAPI(ctx context.Context, _ *sync.WaitGroup, start
 	// command line, or modifying <var>.paths.fileSavePath after instantiating
 	// a new Handler{}.
 	// ------------------------------------------------------------------------
+	h.logger.Infof("%s Writing Kong configuration file to: %s", infoPrefix, h.config.KongPaths.FileSavePath)
 	err = ioutil.WriteFile(h.config.KongPaths.FileSavePath, []byte(configTemplateText), 0644)
 	if err != nil {
 		h.logger.Errorf("%s Failed to write config template to file %s: %w", errPrefix, h.config.KongPaths.FileSavePath, err)
@@ -201,6 +208,7 @@ func (h *Handler) SetupLoopbackAPI(ctx context.Context, _ *sync.WaitGroup, start
 	// issuer (both string vars) and store it in h.jwt.signedToken for later
 	// use.
 	// ------------------------------------------------------------------------
+	h.logger.Infof("%s Creating JWT value", infoPrefix)
 	h.jwt.signedToken, err = h.createJWT(h.keys.privateKey, h.jwt.issuer)
 	if err != nil {
 		h.logger.Errorf("%s Failed to create signed JSON Web Token: %w", errPrefix, err)
@@ -212,8 +220,25 @@ func (h *Handler) SetupLoopbackAPI(ctx context.Context, _ *sync.WaitGroup, start
 	// TODO: Create process to save the string values of the JWT and PK in the
 	// TODO: secret provider (vault).
 	// ------------------------------------------------------------------------
-	// secretProvider.StoreSecrets()
-	fmt.Printf("%s\n", h.jwt.signedToken)
+	h.logger.Infof("%s Storing JWT and Private Key values to the secret store", infoPrefix)
+	for startupTimer.HasNotElapsed() {
+
+		// Create map to store secret values in
+		secrets := map[string]string{
+			"jwt":        h.jwt.signedToken,
+			"privateKey": h.keys.privateKey,
+		}
+
+		// Send secret values to the secret store
+		err = h.secretProvider.StoreSecrets(h.config.SecretStore.Path, secrets)
+		if err != nil {
+			h.logger.Errorf("%s Couldn't store JWT and Private Key to secret store: %w", errPrefix, err)
+			return false
+		}
+
+	}
+
+	// fmt.Printf("%s\n", h.jwt.signedToken)
 
 	// And we're done...
 	h.logger.Infof("%s Loopback API setup is complete", cmdPrefix)

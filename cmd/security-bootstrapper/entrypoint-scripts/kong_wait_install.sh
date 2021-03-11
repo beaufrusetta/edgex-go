@@ -79,5 +79,10 @@ else
   echo "$(date) failed to kong migrations, returned code = " $code
 fi
 
+# Bootstrap Kong's Admin API using the "loopback" feature
+echo "$(date) Configuring Kong's admin api..."
+/edgex-init/security-bootstrapper --confdir=/edgex-init/bootstrap-kong/res configureKong
+
+
 echo "$(date) Starting kong ..."
 exec /docker-entrypoint.sh kong docker-start

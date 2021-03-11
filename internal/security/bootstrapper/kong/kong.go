@@ -19,8 +19,6 @@ package kong
 
 import (
 	"context"
-	"flag"
-	"fmt"
 	"os"
 
 	"github.com/edgexfoundry/edgex-go/internal"
@@ -31,6 +29,7 @@ import (
 
 	"github.com/edgexfoundry/go-mod-bootstrap/v2/bootstrap"
 	"github.com/edgexfoundry/go-mod-bootstrap/v2/bootstrap/flags"
+	"github.com/edgexfoundry/go-mod-bootstrap/v2/bootstrap/handlers"
 	"github.com/edgexfoundry/go-mod-bootstrap/v2/bootstrap/interfaces"
 	"github.com/edgexfoundry/go-mod-bootstrap/v2/bootstrap/startup"
 	"github.com/edgexfoundry/go-mod-bootstrap/v2/di"
@@ -55,22 +54,22 @@ func Configure(ctx context.Context,
 	startupTimer := startup.NewStartUpTimer(clients.SecurityBootstrapRedisKey)
 
 	// CLI Argument Handling
-	var dummy string
+	// var dummy string
 
 	// Create a new flag set
-	flagSet := flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
+	// flagSet := flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
 
 	// Handled by bootstrap; duplicated here to prevent arg parsing errors
-	flagSet.StringVar(&dummy, "confdir", "", "")
+	// flagSet.StringVar(&dummy, "confdir", "", "")
 
 	// Look for "file_save_path" in argument list
 	// flagSet.StringVar()
 
-	err := flagSet.Parse(os.Args[1:])
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(0)
-	}
+	// err := flagSet.Parse(os.Args[1:])
+	// if err != nil {
+	// 	fmt.Println(err)
+	// 	os.Exit(0)
+	// }
 
 	configuration := &config.ConfigurationStruct{}
 	dic := di.NewContainer(di.ServiceConstructorMap{
@@ -95,7 +94,7 @@ func Configure(ctx context.Context,
 		startupTimer,
 		dic,
 		[]interfaces.BootstrapHandler{
-			// handlers.SecureProviderBootstrapHandler,
+			handlers.SecureProviderBootstrapHandler,
 			kongHandler.SetupLoopbackAPI,
 		},
 	)

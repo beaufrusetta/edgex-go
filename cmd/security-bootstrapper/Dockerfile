@@ -43,6 +43,7 @@ RUN apk add --update --no-cache dumb-init su-exec
 
 ENV SECURITY_INIT_DIR /edgex-init
 ARG BOOTSTRAP_REDIS_DIR=${SECURITY_INIT_DIR}/bootstrap-redis
+ARG BOOTSTRAP_KONG_DIR=${SECURITY_INIT_DIR}/bootstrap-kong
 
 RUN mkdir -p ${SECURITY_INIT_DIR} \
     && mkdir -p ${BOOTSTRAP_REDIS_DIR}
@@ -59,6 +60,9 @@ COPY --from=builder /edgex-go/cmd/security-bootstrapper/res/configuration.toml .
 
 # needed for bootstrapping Redis db
 COPY --from=builder /edgex-go/cmd/security-bootstrapper/res-bootstrap-redis/configuration.toml ${BOOTSTRAP_REDIS_DIR}/res/
+
+# needed for bootstrapping Kong
+COPY --from=builder /edgex-go/cmd/security-bootstrapper/res-bootstrap-kong/ ${BOOTSTRAP_KONG_DIR}/res/
 
 # copy Consul ACL related configs
 COPY --from=builder /edgex-go/cmd/security-bootstrapper/consul-acl/ ${SECURITY_INIT_DIR}/consul-bootstrapper/

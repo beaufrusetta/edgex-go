@@ -15,16 +15,16 @@
 
 LogLevel = 'INFO'
 
-# [SecretStore]
-# Type = 'vault'
-# Host = 'localhost'          ## Override in environment variables, if necessary
-# ServerName = ''
-# Port = 8200
-# Protocol = 'http'
-# AdditionalRetryAttempts = 10
-# RetryWaitPeriod = '1s'
-# Path = '/v1/secret/edgex/edgex-security-proxy-setup/'
-# RootCaCertPath = ''
-# TokenFile = '/tmp/edgex/secrets/edgex-security-proxy-setup/secrets-token.json'
-#   [SecretStore.Authentication]
-#   AuthType = 'X-Vault-Token'
+[SecretStore]
+Type = 'vault'
+Protocol = 'http'
+Host = 'localhost'          ## Override in environment variables, if necessary
+Port = 8200
+Path = '/v1/secret/edgex/edgex-security-proxy-setup/'
+TokenFile = '/tmp/edgex/secrets/edgex-security-proxy-setup/secrets-token.json'
+RootCaCertPath = ''
+ServerName = ''
+AdditionalRetryAttempts = 10
+RetryWaitPeriod = '1s'
+  [SecretStore.Authentication]
+  AuthType = 'X-Vault-Token'

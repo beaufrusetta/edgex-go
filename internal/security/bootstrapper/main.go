@@ -28,6 +28,7 @@ import (
 	"github.com/edgexfoundry/edgex-go/internal/security/bootstrapper/config"
 	"github.com/edgexfoundry/edgex-go/internal/security/bootstrapper/container"
 	"github.com/edgexfoundry/edgex-go/internal/security/bootstrapper/handlers"
+	"github.com/edgexfoundry/edgex-go/internal/security/bootstrapper/kong"
 	"github.com/edgexfoundry/edgex-go/internal/security/bootstrapper/redis"
 
 	"github.com/edgexfoundry/go-mod-bootstrap/v2/bootstrap"
@@ -39,6 +40,7 @@ import (
 const (
 	securityBootstrapperServiceKey  = "edgex-security-bootstrapper"
 	configureDatabaseSubcommandName = "configureRedis"
+	configureKongSubCommandName     = "configureKong"
 )
 
 // Main function is the wrapper for the security bootstrapper main
@@ -66,6 +68,12 @@ func Main(ctx context.Context, cancel context.CancelFunc, _ *mux.Router, _ chan<
 	// branch out to bootstrap redis if it is configureRedis
 	if flagSet.Arg(0) == configureDatabaseSubcommandName {
 		redis.Configure(ctx, cancel, f)
+		return
+	}
+
+	// branch out to bootstrap kong if it is configureCong
+	if flagSet.Arg(0) == configureKongSubCommandName {
+		kong.Configure(ctx, cancel, f)
 		return
 	}
 

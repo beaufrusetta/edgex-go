@@ -177,6 +177,14 @@ func (s *Service) Init() error {
 		}
 	}
 
+	// Insert missing code here
+	if s.configuration.KongAuth.Name == "oauth2" {
+		err := s.initOAuth2(s.configuration.KongAuth.TokenTTL)
+		if err != nil {
+			return err
+		}
+	}
+
 	s.loggingClient.Info("finishing initialization for reverse proxy")
 	return nil
 }
@@ -402,50 +410,6 @@ func (s *Service) initKongRoutes(r *models.KongRoute, name string) error {
 	return nil
 }
 
-func (s *Service) initAuthMethod(name string, ttl int) error {
-	s.loggingClient.Info(fmt.Sprintf("selected authetication method as %s.", name))
-	switch name {
-	case "jwt":
-		return s.initJWTAuth()
-	case "oauth2":
-		return s.initOAuth2(ttl)
-	default:
-		return fmt.Errorf("unsupported authetication method: %s", name)
-	}
-}
-
-func (s *Service) initJWTAuth() error {
-	formVals := url.Values{
-		"name": {"jwt"},
-	}
-	tokens := []string{s.configuration.KongURL.GetProxyBaseURL(), PluginsPath}
-	req, err := http.NewRequest(http.MethodPost, strings.Join(tokens, "/"), strings.NewReader(formVals.Encode()))
-	if err != nil {
-		e := fmt.Sprintf("failed to create jwt auth request -- %s", err.Error())
-		s.loggingClient.Error(e)
-		return err
-	}
-	req.Header.Add(common.ContentType, URLEncodedForm)
-
-	resp, err := s.client.Do(req)
-	if err != nil {
-		e := fmt.Sprintf("failed to set up jwt authentication -- %s", err.Error())
-		s.loggingClient.Error(e)
-		return err
-	}
-	defer resp.Body.Close()
-
-	switch resp.StatusCode {
-	case http.StatusOK, http.StatusCreated, http.StatusConflict:
-		s.loggingClient.Info("successful to set up jwt authentication")
-	default:
-		e := fmt.Sprintf("failed to set up jwt authentication with errorcode %d", resp.StatusCode)
-		s.loggingClient.Error(e)
-		return errors.New(e)
-	}
-	return nil
-}
-
 func (s *Service) initOAuth2(ttl int) error {
 	oauth2Params := &models.KongOAuth2Plugin{
 		Name:                    "oauth2",
@@ -471,7 +435,8 @@ func (s *Service) initOAuth2(ttl int) error {
 		s.loggingClient.Error(e)
 		return err
 	}
-	req.Header.Add(common.ContentType, URLEncodedForm)
+	req.Header.Add(internal.AuthHeaderTitle, internal.BearerLabel+s.bearerToken)
+	req.Header.Add(clients.ContentType, URLEncodedForm)
 
 	resp, err := s.client.Do(req)
 	if err != nil {
